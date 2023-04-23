@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Api.Migrations
 {
     [DbContext(typeof(ApplicationContext))]
-    [Migration("20230415073247_IRSMigration")]
+    [Migration("20230423124041_IRSMigration")]
     partial class IRSMigration
     {
         /// <inheritdoc />
@@ -31,31 +31,19 @@ namespace Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("PhotoId")
+                    b.Property<int>("Height")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("PhotoId")
                         .HasColumnType("uuid");
 
-                    b.Property<int>("x0")
+                    b.Property<int>("Width")
                         .HasColumnType("integer");
 
-                    b.Property<int>("x1")
+                    b.Property<int>("x")
                         .HasColumnType("integer");
 
-                    b.Property<int>("x2")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("x3")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("y0")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("y1")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("y2")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("y3")
+                    b.Property<int>("y")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
@@ -71,9 +59,9 @@ namespace Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<byte[]>("Image")
+                    b.Property<string>("Image")
                         .IsRequired()
-                        .HasColumnType("bytea");
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -86,8 +74,11 @@ namespace Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("BookMarkupId")
+                    b.Property<Guid?>("BookMarkupId")
                         .HasColumnType("uuid");
+
+                    b.Property<int>("Height")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Text")
                         .IsRequired()
@@ -97,28 +88,13 @@ namespace Api.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<int>("x0")
+                    b.Property<int>("Width")
                         .HasColumnType("integer");
 
-                    b.Property<int>("x1")
+                    b.Property<int>("x")
                         .HasColumnType("integer");
 
-                    b.Property<int>("x2")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("x3")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("y0")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("y1")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("y2")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("y3")
+                    b.Property<int>("y")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
@@ -130,24 +106,21 @@ namespace Api.Migrations
 
             modelBuilder.Entity("Core.Models.BookMarkup", b =>
                 {
-                    b.HasOne("Core.Models.Photo", "Photo")
+                    b.HasOne("Core.Models.Photo", null)
                         .WithMany("BookMarkups")
-                        .HasForeignKey("PhotoId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Photo");
+                        .HasForeignKey("PhotoId");
                 });
 
             modelBuilder.Entity("Core.Models.TextMarkup", b =>
                 {
-                    b.HasOne("Core.Models.BookMarkup", "BookMarkup")
-                        .WithMany()
-                        .HasForeignKey("BookMarkupId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                    b.HasOne("Core.Models.BookMarkup", null)
+                        .WithMany("TextMarkups")
+                        .HasForeignKey("BookMarkupId");
+                });
 
-                    b.Navigation("BookMarkup");
+            modelBuilder.Entity("Core.Models.BookMarkup", b =>
+                {
+                    b.Navigation("TextMarkups");
                 });
 
             modelBuilder.Entity("Core.Models.Photo", b =>

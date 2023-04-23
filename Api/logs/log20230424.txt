@@ -1,0 +1,2 @@
+2023-04-24 00:44:28.927 +10:00 [WRN] Failed to determine the https port for redirect.
+2023-04-24 00:44:29.035 +10:00 [INF] Pushed marukps into a database

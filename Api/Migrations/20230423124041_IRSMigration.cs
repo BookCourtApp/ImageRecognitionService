@@ -16,7 +16,7 @@ namespace Api.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    Image = table.Column<byte[]>(type: "bytea", nullable: false)
+                    Image = table.Column<string>(type: "text", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -28,15 +28,11 @@ namespace Api.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    PhotoId = table.Column<Guid>(type: "uuid", nullable: false),
-                    x0 = table.Column<int>(type: "integer", nullable: false),
-                    x1 = table.Column<int>(type: "integer", nullable: false),
-                    x2 = table.Column<int>(type: "integer", nullable: false),
-                    x3 = table.Column<int>(type: "integer", nullable: false),
-                    y0 = table.Column<int>(type: "integer", nullable: false),
-                    y1 = table.Column<int>(type: "integer", nullable: false),
-                    y2 = table.Column<int>(type: "integer", nullable: false),
-                    y3 = table.Column<int>(type: "integer", nullable: false)
+                    x = table.Column<int>(type: "integer", nullable: false),
+                    y = table.Column<int>(type: "integer", nullable: false),
+                    Height = table.Column<int>(type: "integer", nullable: false),
+                    Width = table.Column<int>(type: "integer", nullable: false),
+                    PhotoId = table.Column<Guid>(type: "uuid", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -45,8 +41,7 @@ namespace Api.Migrations
                         name: "FK_BookMarkups_Photos_PhotoId",
                         column: x => x.PhotoId,
                         principalTable: "Photos",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -54,17 +49,13 @@ namespace Api.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    BookMarkupId = table.Column<Guid>(type: "uuid", nullable: false),
                     Type = table.Column<string>(type: "text", nullable: false),
                     Text = table.Column<string>(type: "text", nullable: false),
-                    x0 = table.Column<int>(type: "integer", nullable: false),
-                    x1 = table.Column<int>(type: "integer", nullable: false),
-                    x2 = table.Column<int>(type: "integer", nullable: false),
-                    x3 = table.Column<int>(type: "integer", nullable: false),
-                    y0 = table.Column<int>(type: "integer", nullable: false),
-                    y1 = table.Column<int>(type: "integer", nullable: false),
-                    y2 = table.Column<int>(type: "integer", nullable: false),
-                    y3 = table.Column<int>(type: "integer", nullable: false)
+                    x = table.Column<int>(type: "integer", nullable: false),
+                    y = table.Column<int>(type: "integer", nullable: false),
+                    Height = table.Column<int>(type: "integer", nullable: false),
+                    Width = table.Column<int>(type: "integer", nullable: false),
+                    BookMarkupId = table.Column<Guid>(type: "uuid", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -73,8 +64,7 @@ namespace Api.Migrations
                         name: "FK_TextMarkups_BookMarkups_BookMarkupId",
                         column: x => x.BookMarkupId,
                         principalTable: "BookMarkups",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateIndex(

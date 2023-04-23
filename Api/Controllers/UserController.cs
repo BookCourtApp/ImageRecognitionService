@@ -4,7 +4,8 @@ using System.Text.Json;
 
 using Core.Repository;
 using Core.Models;
-using Api.Mapping;
+//using Core.ModelsDto;
+//using Api.Mapping;
 
 namespace Api.Controllers;
 
@@ -15,13 +16,11 @@ public class UserController : ControllerBase
 
     private readonly ILogger<UserController> _logger;
     private readonly IRepository _repository;
-    private readonly PhotoMapper _photoMapper;
 
-    public UserController(ILogger<UserController> logger, IRepository repository, PhotoMapper photoMapper)
+    public UserController(ILogger<UserController> logger, IRepository repository )
     {
         _logger = logger;
         _repository = repository;
-        _photoMapper = photoMapper;
     }
 
     [HttpGet("TestController")]
@@ -29,9 +28,9 @@ public class UserController : ControllerBase
         return Ok(new {requestStatus = "Ok"});
     }
     [HttpPost("PhotoMarkup")]
-    public async Task<IActionResult> PhotoMarkup([FromBody] JsonElement jasonString){
-        List<Photo> Photos = _photoMapper.ProceedAllPhotos(jasonString);
-        await _repository.TestAddRangeAsync(Photos);
+    public async Task<IActionResult> PhotoMarkup([FromBody] MarkupDto Dto){
+        await _repository.TestAddRangeAsync(Dto.Photos);
+        _logger.LogInformation("Pushed marukps into a database");
         return Ok(new {requestStatus = "Ok"});
     }
 }

@@ -1,10 +1,8 @@
-
+using Newtonsoft.Json;
 
 namespace Core.Models;
 
 public class MarkupDto
 {
-    public System.Text.Json.JsonElement MBook { get; set; }
-    public System.Text.Json.JsonElement MData { get; set; }
-    public System.Text.Json.JsonElement MText { get; set; }
+    public List<Photo> Photos { get; set; }
 }
