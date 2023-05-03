@@ -22,6 +22,8 @@ public class LearningManager
     private readonly IRepository _reposiotry;
     private System.Timers.Timer LearnTimer;
     private string _weights;
+    private LearnSession _currentLearnVersion;
+    private PlanConfig _currentPlanConfig;
     public LearningManager(IRepository repository){
         _reposiotry = repository;
     }
@@ -34,35 +36,39 @@ public class LearningManager
         //3. - это по номеру, которые он хочет из списка, который вызвал и ShowLearnSessions +
         switch(Request){
             case "Latest":
-                return await _reposiotry.GetLatestLearnSession();
+                _currentLearnVersion = await _reposiotry.GetLatestLearnSession();
+                return _currentLearnVersion;
             case "Best":
-                return await _reposiotry.GetBestLearnSession();
+                _currentLearnVersion = await _reposiotry.GetBestLearnSession();
+                return _currentLearnVersion;
             default:
                 Guid Id = new Guid(Request);
-                return await _reposiotry.GetLearnSessionById(Id);
+                _currentLearnVersion = await _reposiotry.GetLearnSessionById(Id);
+                return _currentLearnVersion;
         }
     }
 
-    public async Task<List<LearnSession>> ShowLearnSessions() //api call показать версии обучений
-    {
-        return await _reposiotry.GetAllLearnSessions();
-    }
 
     public void StartPlan(PlanConfig Config) //api call запланировать 
     {
+        _currentPlanConfig = Config;
         StopPlan();
         LearnTimer.Interval = TimeInterval[Config.LearnDate];
         LearnTimer.AutoReset = Config.AutoReset;
-        LearnTimer.Elapsed += StartLearning;
+        LearnTimer.Elapsed += StartLearningByEvent;
         LearnTimer.Start();
     }
+    public PlanConfig GetCurrentPlanConfig() => _currentPlanConfig;
+    public LearnSession GetCurrentLearnVersion() => _currentLearnVersion;
+    public async Task<List<LearnSession>> ShowLearnSessions() => await _reposiotry.GetAllLearnSessions();
 
     public void StopPlan() //api call остановить план
     {
         LearnTimer.Enabled = false;
     }
 
-    public void StartLearning(Object source, ElapsedEventArgs e) //api call принудительный старт
+    public void StartLearningByEvent(Object source, ElapsedEventArgs e) => StartLearning();
+    public void StartLearning() //api call принудительный старт
     {
         //List<Photo> Photos = await _reposiotry.GetAllPhotosAsync();
         //Console.WriteLine($"\nResult: {Photos[0].BookMarkups[0].TextMarkups[0].Text}\n");
