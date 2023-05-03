@@ -12,6 +12,22 @@ namespace Api.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
+                name: "LearnSessions",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Version = table.Column<string>(type: "text", nullable: false),
+                    LearnTime = table.Column<float>(type: "real", nullable: false),
+                    Precision = table.Column<float>(type: "real", nullable: false),
+                    LearnDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    Weights = table.Column<string>(type: "text", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_LearnSessions", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Photos",
                 columns: table => new
                 {
@@ -81,6 +97,9 @@ namespace Api.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "LearnSessions");
+
             migrationBuilder.DropTable(
                 name: "TextMarkups");
 

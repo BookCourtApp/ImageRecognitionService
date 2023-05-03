@@ -7,7 +7,7 @@ using Serilog;
 using Infrastructure;
 using Infrastructure.DataAccessLayer;
 using Core.Repository;
-//using Api.Mapping;
+using BusinessLogic;
 
 Log.Logger = new LoggerConfiguration()
     .CreateLogger();
@@ -35,6 +35,7 @@ try
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen();
     builder.Services.AddScoped<IRepository, MakrupRepository>();
+    builder.Services.AddScoped<LearningManager>();
 
     var app = builder.Build();
 

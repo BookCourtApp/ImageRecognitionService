@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Api.Migrations
 {
     [DbContext(typeof(ApplicationContext))]
-    [Migration("20230423124041_IRSMigration")]
+    [Migration("20230426111240_IRSMigration")]
     partial class IRSMigration
     {
         /// <inheritdoc />
@@ -51,6 +51,34 @@ namespace Api.Migrations
                     b.HasIndex("PhotoId");
 
                     b.ToTable("BookMarkups");
+                });
+
+            modelBuilder.Entity("Core.Models.LearnSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("LearnDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<float>("LearnTime")
+                        .HasColumnType("real");
+
+                    b.Property<float>("Precision")
+                        .HasColumnType("real");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Weights")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("LearnSessions");
                 });
 
             modelBuilder.Entity("Core.Models.Photo", b =>

@@ -1,5 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <ItemGroup>
+    <ProjectReference Include="..\Infrastructure\Infrastructure.csproj" />
+    <ProjectReference Include="..\Core\Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="IronPython" Version="3.4.0" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net7.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

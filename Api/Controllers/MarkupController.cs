@@ -11,13 +11,13 @@ namespace Api.Controllers;
 
 [ApiController]
 [Route("/")]
-public class UserController : ControllerBase
+public class MarkupController : ControllerBase
 {
 
-    private readonly ILogger<UserController> _logger;
+    private readonly ILogger<MarkupController> _logger;
     private readonly IRepository _repository;
 
-    public UserController(ILogger<UserController> logger, IRepository repository )
+    public MarkupController(ILogger<MarkupController> logger, IRepository repository )
     {
         _logger = logger;
         _repository = repository;
