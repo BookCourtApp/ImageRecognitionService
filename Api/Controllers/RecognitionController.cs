@@ -31,8 +31,8 @@ public class RecognitionController : ControllerBase
         return Ok(new {requestStatus = "Ok"});
     }
     [HttpPost("Recognition")]
-    public async Task<IActionResult> Recognition([FromBody] Object Image){ //!!!!!!!!!!!11
-        await _learningManager.Recognition((string)Image); //!!!!! нужно решить, что будет подаваться в эту функцию api
+    public async Task<IActionResult> Recognition([FromBody] ImageDto Dto){ 
+        await _learningManager.Recognition(Dto.Image); 
         return Ok(new {requestStatus = "Ok"});
     }
 }
