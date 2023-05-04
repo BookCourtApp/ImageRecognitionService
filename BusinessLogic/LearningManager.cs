@@ -12,6 +12,10 @@ using Infrastructure.DataAccessLayer;
 
 namespace BusinessLogic;
 
+/// <summary>
+/// Класс, отвечающий за взаимодействие с файлами ИИ.
+/// С его помощью можно администрировать: обучение, запуск.
+/// </summary>
 public class LearningManager
 {
     private Dictionary<string, uint> TimeInterval = new Dictionary<string, uint>{
@@ -28,12 +32,14 @@ public class LearningManager
         _reposiotry = repository;
     }
 
+    /// <summary>
+    /// Функция для выбора обучения, при котором пользователь можно задать настройки выбора версии. 
+    /// Можно выбрать: Послденюю, лучшую и по айди 
+    /// </summary>
+    /// <param name="Request">Версию обучения для выбора</param>
+    /// <returns>Возвращает выбранну версию обучения</returns>
     public async Task<LearnSession> PickLearnVersion(string Request) //api call выставить версию обучения(а.к.а выставить рабочие веса)
     {
-        //Админ может запросить выставить версию обучения в виде трех вариантов:
-        //1. - это последняя +
-        //2. - это самая лучшая +
-        //3. - это по номеру, которые он хочет из списка, который вызвал и ShowLearnSessions +
         switch(Request){
             case "Latest":
                 _currentLearnVersion = await _reposiotry.GetLatestLearnSession();
@@ -47,8 +53,10 @@ public class LearningManager
                 return _currentLearnVersion;
         }
     }
-
-
+    /// <summary>
+    /// Функция, позволяющая настроить автоматическое обучение ИИ 
+    /// </summary>
+    /// <param name="Config">Конфигурая плана для запуска обучений</param>
     public void StartPlan(PlanConfig Config) //api call запланировать 
     {
         _currentPlanConfig = Config;
@@ -58,16 +66,34 @@ public class LearningManager
         LearnTimer.Elapsed += StartLearningByEvent;
         LearnTimer.Start();
     }
+    /// <summary>
+    /// Функция для получения текущего плана автоматического запуска обучений
+    /// </summary>
+    /// <returns>Возвращает текущий план автоматического запуска обучений ИИ</returns>
     public PlanConfig GetCurrentPlanConfig() => _currentPlanConfig;
+    /// <summary>
+    /// Функция для получения информации о текущей версии обучения для алгоритмов распознавания 
+    /// </summary>
+    /// <returns>Возращает текущую версию обучения для запуска распознанвания</returns>
     public LearnSession GetCurrentLearnVersion() => _currentLearnVersion;
+    /// <summary>
+    /// Функция для получения информации о всех версия обучений
+    /// </summary>
+    /// <returns>Возвращает список всех версий обучений </returns>
     public async Task<List<LearnSession>> ShowLearnSessions() => await _reposiotry.GetAllLearnSessions();
-
-    public void StopPlan() //api call остановить план
-    {
-        LearnTimer.Enabled = false;
-    }
-
+    /// <summary>
+    /// Функция для остановки автоматического обучения ИИ
+    /// </summary>
+    public void StopPlan() => LearnTimer.Enabled = false;
+    /// <summary>
+    /// Функция для исполнения функции StartLearning, но в качестве ивента, если включен режим автоматического обучения
+    /// </summary>
+    /// <param name="source">Служебный параметр ивента</param>
+    /// <param name="e">Служебный параметр ивента</param>
     public void StartLearningByEvent(Object source, ElapsedEventArgs e) => StartLearning();
+    /// <summary>
+    /// Функция для запуска обучения ИИ
+    /// </summary>
     public void StartLearning() //api call принудительный старт
     {
         //List<Photo> Photos = await _reposiotry.GetAllPhotosAsync();
@@ -109,9 +135,14 @@ public class LearningManager
         //await _reposiotry.AddLearnSessionAsync(NewSession);
     }
 
+    /// <summary>
+    /// Функция для запуска распознавания
+    /// </summary>
+    /// <param name="Image">Изображения для распознавания</param>
+    /// <returns>Возвращает структуру с информацией о распознанном изображении</returns>
     public async Task<RecognizedImage> Recognition(string Image) //api call распознавание
     {
-        string jsonString = System.Text.Json.JsonSerializer.Serialize(Image);
+        //string jsonString = System.Text.Json.JsonSerializer.Serialize(Image);
 
         var runtime = Python.CreateRuntime();
         var engine = runtime.GetEngine("python");
@@ -120,7 +151,7 @@ public class LearningManager
         var scope = engine.CreateScope();
         try{
             var argv = new List<string>();
-            string[] args = {"../BusinessLogic/prog.py", jsonString};
+            string[] args = { "../BusinessLogic/prog.py", Image};//jsonString};
             args.ToList().ForEach(a => argv.Add(a));
 
             runtime.GetSysModule().SetVariable("argv", argv);
@@ -141,6 +172,11 @@ public class LearningManager
         }
 
     }
+    /// <summary>
+    /// Функция, нужная для работы библиотеки IronPython.
+    /// </summary>
+    /// <param name="engine">Служебный параметр</param>
+    /// <returns>Возвращает список библиотек для запуска скрипта питона</returns>
     private ICollection SetPaths(ScriptEngine engine) //служебные функция для работы IronPython
     {
         var Paths = engine.GetSearchPaths();
