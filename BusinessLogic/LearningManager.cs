@@ -9,6 +9,7 @@ using System.Timers;
 using Core.Repository;
 using Core.Models;
 using Infrastructure.DataAccessLayer;
+using Microsoft.Extensions.Logging;
 
 namespace BusinessLogic;
 
@@ -28,8 +29,11 @@ public class LearningManager
     private string _weights;
     private LearnSession _currentLearnVersion;
     private PlanConfig _currentPlanConfig;
-    public LearningManager(IRepository repository){
+    private readonly ILogger<LearningManager> _logger;
+    public LearningManager(IRepository repository, ILogger<LearningManager> Logger)
+    {
         _reposiotry = repository;
+        _logger = Logger;
     }
 
     /// <summary>
@@ -40,18 +44,21 @@ public class LearningManager
     /// <returns>Возвращает выбранну версию обучения</returns>
     public async Task<LearnSession> PickLearnVersion(string Request) //api call выставить версию обучения(а.к.а выставить рабочие веса)
     {
-        switch(Request){
+        switch (Request)
+        {
             case "Latest":
                 _currentLearnVersion = await _reposiotry.GetLatestLearnSession();
-                return _currentLearnVersion;
+                break;
             case "Best":
                 _currentLearnVersion = await _reposiotry.GetBestLearnSession();
-                return _currentLearnVersion;
+                break;
             default:
                 Guid Id = new Guid(Request);
                 _currentLearnVersion = await _reposiotry.GetLearnSessionById(Id);
-                return _currentLearnVersion;
+                break;
         }
+        _logger.LogInformation($"Learn version picked: {Request}");
+        return _currentLearnVersion;
     }
     /// <summary>
     /// Функция, позволяющая настроить автоматическое обучение ИИ 
@@ -65,37 +72,60 @@ public class LearningManager
         LearnTimer.AutoReset = Config.AutoReset;
         LearnTimer.Elapsed += StartLearningByEvent;
         LearnTimer.Start();
+        _logger.LogInformation("Learning plan is configured");
     }
     /// <summary>
     /// Функция для получения текущего плана автоматического запуска обучений
     /// </summary>
     /// <returns>Возвращает текущий план автоматического запуска обучений ИИ</returns>
-    public PlanConfig GetCurrentPlanConfig() => _currentPlanConfig;
+    public PlanConfig GetCurrentPlanConfig()
+    {
+        _logger.LogInformation("Current plan config returned");
+        return _currentPlanConfig;
+    }
     /// <summary>
     /// Функция для получения информации о текущей версии обучения для алгоритмов распознавания 
     /// </summary>
     /// <returns>Возращает текущую версию обучения для запуска распознанвания</returns>
-    public LearnSession GetCurrentLearnVersion() => _currentLearnVersion;
+    public LearnSession GetCurrentLearnVersion(){
+        _logger.LogInformation("Current learn version returned");
+        return _currentLearnVersion;
+    }
     /// <summary>
     /// Функция для получения информации о всех версия обучений
     /// </summary>
     /// <returns>Возвращает список всех версий обучений </returns>
-    public async Task<List<LearnSession>> ShowLearnSessions() => await _reposiotry.GetAllLearnSessions();
+    public async Task<List<LearnSession>> ShowLearnSessions()
+    {
+        var result = await _reposiotry.GetAllLearnSessions();
+        _logger.LogInformation("Learn session returned");
+        return result;
+    }
     /// <summary>
     /// Функция для остановки автоматического обучения ИИ
     /// </summary>
-    public void StopPlan() => LearnTimer.Enabled = false;
+    public void StopPlan()
+    {
+        LearnTimer.Enabled = false;
+        _logger.LogInformation("Learning plan stopped ");
+    } 
     /// <summary>
     /// Функция для исполнения функции StartLearning, но в качестве ивента, если включен режим автоматического обучения
     /// </summary>
     /// <param name="source">Служебный параметр ивента</param>
     /// <param name="e">Служебный параметр ивента</param>
-    public void StartLearningByEvent(Object source, ElapsedEventArgs e) => StartLearning();
+    public void StartLearningByEvent(Object source, ElapsedEventArgs e)
+    {
+        _logger.LogInformation("Starting learning by event");
+        StartLearning();
+    } 
     /// <summary>
     /// Функция для запуска обучения ИИ
     /// </summary>
     public void StartLearning() //api call принудительный старт
     {
+        _logger.LogInformation("Starting learning");
+
         //List<Photo> Photos = await _reposiotry.GetAllPhotosAsync();
         //Console.WriteLine($"\nResult: {Photos[0].BookMarkups[0].TextMarkups[0].Text}\n");
         //string jsonString = JsonSerializer.Serialize(Photos);//JsonSerializer.Serialize(Photos);
@@ -133,6 +163,8 @@ public class LearningManager
         //    Weights = "5.5|5.6|5.7"
         //};
         //await _reposiotry.AddLearnSessionAsync(NewSession);
+
+        _logger.LogInformation("Ending learning");
     }
 
     /// <summary>
@@ -143,6 +175,7 @@ public class LearningManager
     public async Task<RecognizedImage> Recognition(string Image) //api call распознавание
     {
         //string jsonString = System.Text.Json.JsonSerializer.Serialize(Image);
+        _logger.LogInformation("Starting recognition");
 
         var runtime = Python.CreateRuntime();
         var engine = runtime.GetEngine("python");
@@ -151,7 +184,7 @@ public class LearningManager
         var scope = engine.CreateScope();
         try{
             var argv = new List<string>();
-            string[] args = { "../BusinessLogic/prog.py", Image};//jsonString};
+            string[] args = { "../BusinessLogic/prog.py", Image};
             args.ToList().ForEach(a => argv.Add(a));
 
             runtime.GetSysModule().SetVariable("argv", argv);
@@ -163,11 +196,12 @@ public class LearningManager
 
             var result = scope.GetVariable("result");
             //Console.WriteLine(result);
-
+            _logger.LogInformation("Ending recognition");
             return JsonConvert.DeserializeObject(result);
         }
         catch(Exception ex){
             Console.WriteLine($"ERROR: {ex.Message}");
+            _logger.LogInformation("Ending recognition with error");
             return new RecognizedImage();
         }
 
