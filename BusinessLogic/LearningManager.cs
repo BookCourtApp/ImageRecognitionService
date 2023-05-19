@@ -223,11 +223,3 @@ public class LearningManager
     }
 
 }
-
-//Не получилось использовать из за переполнение Int типа в Month 
-//enum TimeInterval
-//{
-//    Day = 86400000, // Number of milliseconds in a day.
-//    Week = 604800000, // Number of milliseconds in a week.
-//    Month = 2592000000 // Number of milliseconds in a month (30 days).
-//}
