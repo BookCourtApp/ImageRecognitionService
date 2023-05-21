@@ -58,13 +58,14 @@ im = load_image_base64(image_data)
 # load OCR model for russian language
 ocr = PaddleOCR(use_angle_cls=True, lang="ru")
 
+path_to_json = sys.argv[2]
 # load results from segmentation module
-with open('books.json', 'r') as f:
+with open(path_to_json, 'r') as f:
     books = json.load(f)
 
 books_obj = []
 for book in books:
-    print(book)
+    #print(book)
     # get markup
     height = int(book['Height'])
     width = int(book['Width'])
@@ -85,3 +86,4 @@ for book in books:
     books_obj.append(book_obj.__dict__)
 
 result = json.dumps(books_obj)
+print(result)
