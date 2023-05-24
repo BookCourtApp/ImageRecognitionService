@@ -12,14 +12,28 @@ from detectron2.config import get_cfg
 from detectron2.data.catalog import Metadata
 from detectron2.engine import DefaultPredictor
 
+# import some common libraries
+import base64
+import ast
+import json
+import cv2
+import sys
+import numpy as np
+from PIL import Image
+from paddleocr import PaddleOCR
+
 
 # class to store book information
 class Book:
-    def __init__(self, height, width, x, y, recognizedText):
-        self.Height = height
-        self.Width = width
-        self.x = x
-        self.y = y
+    def __init__(self, x1, x2, x3, x4, y1, y2, y3, y4, recognizedText):
+        self.x1 = x1,
+        self.x2 = x2,
+        self.x3 = x3,
+        self.x4 = x4,
+        self.y1 = y1,
+        self.y2 = y2,
+        self.y3 = y3,
+        self.y4 = y4,
         self.RecognizedText = recognizedText
 
 
@@ -54,11 +68,31 @@ def load_image_base64(image_data):
     return img
 
 
+# image preprocess before ocr
+def preprocess(image):
+    #upscale image
+    if image.shape[0] < 100 or image.shape[1] < 100:
+        scale_percent = 200  # percent of original size
+        width = int(image.shape[1] * scale_percent / 100)
+        height = int(image.shape[0] * scale_percent / 100)
+        dim = (width, height)
+        image = cv2.resize(image, dim, interpolation=cv2.INTER_LINEAR)
+    # sharpen image
+    sharp = cv2.filter2D(image, -1, kernel=np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]]))
+    #sharp = cv2.medianBlur(sharp, 1)
+    sharp = cv2.bilateralFilter(sharp, 9, 75, 75)
+
+    return sharp
+
+
 # load files for model
 path_to_config = sys.argv[1]
 path_to_model = sys.argv[2]
 # load model
 predictor = load_model(path_to_config, path_to_model)
+
+# load OCR model for russian language
+ocr = PaddleOCR(use_angle_cls=True, lang="ru")
 
 # load image by base64 data
 base64_path = sys.argv[3]
@@ -66,31 +100,41 @@ with open(base64_path, 'r') as f:
     image_data = f.read()
 im = load_image_base64(image_data)
 
-# make prediction
+# make prediction on segmentation
 outputs = predictor(im)
 
 # get masks of found objects
 masks = np.asarray(outputs["instances"].pred_masks.to("cpu"))
 
 # iterate every found obj(book)
-book_coord = []
+books = []
 for item_mask in masks:
     # Get the true bounding box of the mask
     segmentation = np.where(item_mask == True)
 
+    # Get coordinates of bounding box
     x_min = int(np.min(segmentation[1]))
     x_max = int(np.max(segmentation[1]))
     y_min = int(np.min(segmentation[0]))
     y_max = int(np.max(segmentation[0]))
 
-    # store it in object
-    book = Book(y_max-y_min, x_max-x_min, x_min, y_min, [])
+    # crop book spine from image
+    cropped = Image.fromarray(im[y_min:y_max, x_min:x_max, :], mode='RGB')
+    cropped = np.array(cropped)
+    # preprocess image
+    cropped = preprocess(cropped)
+    # get text bag from image
+    res_paddle = ocr.ocr(np.array(cropped))
+    # filter one symbols
+    wordlist = [word[1][0] for word in res_paddle[0] if len(word[0][1]) > 1]
 
-    book_coord.append(book.__dict__)
-# save to json
-result = json.dumps(book_coord)
-#print(result)
+    # store it in object
+    book = Book(x_min, x_max, x_min, x_min, y_max, y_max, y_min, y_min, [wordlist])
+
+    books.append(book.__dict__)
 
 # Save the JSON-formatted string to a file
+result = json.dumps(books)
+#print(result)
 with open('books.json', 'w') as f:
     f.write(result)
