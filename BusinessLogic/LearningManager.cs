@@ -5,6 +5,7 @@ using System.Text.Json;
 using Microsoft.Scripting.Hosting;
 using System.Collections;
 using System.Timers;
+using System.Diagnostics;
 
 using Core.Repository;
 using Core.Models;
@@ -126,43 +127,7 @@ public class LearningManager
     {
         _logger.LogInformation("Starting learning");
 
-        //List<Photo> Photos = await _reposiotry.GetAllPhotosAsync();
-        //Console.WriteLine($"\nResult: {Photos[0].BookMarkups[0].TextMarkups[0].Text}\n");
-        //string jsonString = JsonSerializer.Serialize(Photos);//JsonSerializer.Serialize(Photos);
-
-        //var runtime = Python.CreateRuntime();
-        //var engine = runtime.GetEngine("python");
-        //var Paths = SetPaths(engine);
-        //engine.SetSearchPaths((ICollection<string>)Paths);
-        //var scope = engine.CreateScope();
-        //try{
-        //    var argv = new List<string>();
-        //    string[] args = {"../BusinessLogic/prog.py", jsonString};
-        //    args.ToList().ForEach(a => argv.Add(a));
-
-        //    runtime.GetSysModule().SetVariable("argv", argv);
-
-        //    await Task.Run(() =>
-        //    {
-        //        engine.ExecuteFile(args[0], scope);
-        //    });
-
-        //    var result = scope.GetVariable("result");
-        //    //Console.WriteLine(result);
-
-        //}
-        //catch(Exception ex){
-        //    Console.WriteLine($"ERROR: {ex.Message}");
-        //}
-        //LearnSession NewSession = new LearnSession //берем полученное обучение и пушим в бд
-        //{
-        //    Version = "One",
-        //    LearnTime = 5.5f,
-        //    Precision = .4f,
-        //    LearnDate = default!,
-        //    Weights = "5.5|5.6|5.7"
-        //};
-        //await _reposiotry.AddLearnSessionAsync(NewSession);
+        //ExecuteCommand();
 
         _logger.LogInformation("Ending learning");
     }
@@ -172,54 +137,36 @@ public class LearningManager
     /// </summary>
     /// <param name="Image">Изображения для распознавания</param>
     /// <returns>Возвращает структуру с информацией о распознанном изображении</returns>
-    public async Task<RecognizedImage> Recognition(string Image) //api call распознавание
+    public /*async Task*/ void Recognition(string Image) //api call распознавание
     {
         //string jsonString = System.Text.Json.JsonSerializer.Serialize(Image);
+        File.WriteAllText("photo.b64", Image);
         _logger.LogInformation("Starting recognition");
 
-        var runtime = Python.CreateRuntime();
-        var engine = runtime.GetEngine("python");
-        var Paths = SetPaths(engine);
-        engine.SetSearchPaths((ICollection<string>)Paths);
-        var scope = engine.CreateScope();
-        try{
-            var argv = new List<string>();
-            string[] args = { "../BusinessLogic/prog.py", Image};
-            args.ToList().ForEach(a => argv.Add(a));
+        ExecuteCommand("python3 ../BusinessLogic/ai/segmentation.py ../BusinessLogic/ai/model/config.yaml ../BusinessLogic/ai/model/model_final.pth photo.b64");
+        ExecuteCommand("python3 ../BusinessLogic/ai/main_ocr.py photo.b64 books.json");
 
-            runtime.GetSysModule().SetVariable("argv", argv);
-
-            await Task.Run(() =>
-            {
-                engine.ExecuteFile(args[0], scope);
-            });
-
-            var result = scope.GetVariable("result");
-            //Console.WriteLine(result);
-            _logger.LogInformation("Ending recognition");
-            return JsonConvert.DeserializeObject(result);
-        }
-        catch(Exception ex){
-            Console.WriteLine($"ERROR: {ex.Message}");
-            _logger.LogInformation("Ending recognition with error");
-            return new RecognizedImage();
-        }
+        _logger.LogInformation("Ending recognition");
 
     }
-    /// <summary>
-    /// Функция, нужная для работы библиотеки IronPython.
-    /// </summary>
-    /// <param name="engine">Служебный параметр</param>
-    /// <returns>Возвращает список библиотек для запуска скрипта питона</returns>
-    private ICollection SetPaths(ScriptEngine engine) //служебные функция для работы IronPython
+    private void ExecuteCommand(string command)
     {
-        var Paths = engine.GetSearchPaths();
-        Paths.Add(@"/usr/lib/python38.zip");
-        Paths.Add(@"/usr/lib/python3.8");
-        Paths.Add(@"/usr/lib/python3.8/lib-dynload");
-        Paths.Add(@"/usr/local/lib/python3.8/dist-packages");
-        Paths.Add(@"/usr/lib/python3/dist-packages");
-        return (ICollection)Paths;
+        // Create a process start info object
+        ProcessStartInfo startInfo = new ProcessStartInfo();
+        startInfo.FileName = "/bin/bash"; // Change this to the appropriate shell for your system
+        startInfo.Arguments = "-c \"" + command + "\"";
+        startInfo.RedirectStandardOutput = true;
+        startInfo.UseShellExecute = false;
+
+        // Start the process and wait for it to complete
+        using (Process process = Process.Start(startInfo))
+        {
+            process.WaitForExit();
+
+            // Print the output from the command
+            Console.WriteLine(process.StandardOutput.ReadToEnd());
+        }
     }
 
 }
+
