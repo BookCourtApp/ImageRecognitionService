@@ -86,4 +86,7 @@ for book in books:
     books_obj.append(book_obj.__dict__)
 
 result = json.dumps(books_obj)
-print(result)
+
+# Save the JSON-formatted string to a file
+with open('result.json', 'w') as f:
+    f.write(result)
