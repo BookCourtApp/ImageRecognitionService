@@ -127,8 +127,9 @@ for item_mask in masks:
     res_paddle = ocr.ocr(np.array(cropped))
     # filter one symbols
     wordlist = [word[1][0] for word in res_paddle[0] if len(word[1][0]) > 2]
+    print(wordlist)
     # store it in object
-    book = Book(x_min, x_max, x_min, x_min, y_max, y_max, y_min, y_min, [wordlist])
+    book = Book(x_min, x_max, x_min, x_min, y_max, y_max, y_min, y_min, wordlist)
 
     books.append(book.__dict__)
 
