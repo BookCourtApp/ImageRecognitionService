@@ -1,8 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Sqlite;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
+using Nest;
+using Elasticsearch.Net;
 
 using Infrastructure;
 using Infrastructure.DataAccessLayer;
@@ -30,12 +33,21 @@ try
     builder.Services.AddDbContextFactory<ApplicationContext>(options =>
         options.UseNpgsql(builder.Configuration.GetConnectionString("ConnectionString"), b => b.MigrationsAssembly("Api")));
 
+    builder.Services.AddDbContextFactory<BooksContext>(options =>
+        options.UseSqlite("Data Source=/home/alex/Documents/projects/csharp/ImageRecognitionService/Core/LABIRINT_BOOK24.db"));
+
     builder.Services.AddControllers();
     // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen();
     builder.Services.AddScoped<IRepository, MakrupRepository>();
     builder.Services.AddScoped<LearningManager>();
+    builder.Services.AddScoped<IElasticClient>(sp =>
+        {
+            var settings = new ConnectionSettings(new Uri("http://localhost:9200")).DefaultIndex("books");
+            return new ElasticClient(settings);
+        }
+    );
 
     var app = builder.Build();
 
