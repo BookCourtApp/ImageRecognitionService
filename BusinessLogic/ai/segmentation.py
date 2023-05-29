@@ -26,14 +26,14 @@ from paddleocr import PaddleOCR
 # class to store book information
 class Book:
     def __init__(self, x1, x2, x3, x4, y1, y2, y3, y4, recognizedText):
-        self.x1 = x1,
-        self.x2 = x2,
-        self.x3 = x3,
-        self.x4 = x4,
-        self.y1 = y1,
-        self.y2 = y2,
-        self.y3 = y3,
-        self.y4 = y4,
+        self.x1 = x1
+        self.x2 = x2
+        self.x3 = x3
+        self.x4 = x4
+        self.y1 = y1
+        self.y2 = y2
+        self.y3 = y3
+        self.y4 = y4
         self.RecognizedText = recognizedText
 
 
@@ -126,8 +126,7 @@ for item_mask in masks:
     # get text bag from image
     res_paddle = ocr.ocr(np.array(cropped))
     # filter one symbols
-    wordlist = [word[1][0] for word in res_paddle[0] if len(word[0][1]) > 1]
-
+    wordlist = [word[1][0] for word in res_paddle[0] if len(word[1][0]) > 2]
     # store it in object
     book = Book(x_min, x_max, x_min, x_min, y_max, y_max, y_min, y_min, [wordlist])
 
