@@ -137,17 +137,46 @@ public class LearningManager
     /// </summary>
     /// <param name="Image">Изображения для распознавания</param>
     /// <returns>Возвращает структуру с информацией о распознанном изображении</returns>
-    public /*async Task*/ void Recognition(string Image) //api call распознавание
+    public async Task<List<OcrRequest>> Recognition(string Image) //api call распознавание
     {
-        //string jsonString = System.Text.Json.JsonSerializer.Serialize(Image);
         File.WriteAllText("photo.b64", Image);
         _logger.LogInformation("Starting recognition");
 
-        ExecuteCommand("python3 ../BusinessLogic/ai/segmentation.py ../BusinessLogic/ai/model/config.yaml ../BusinessLogic/ai/model/model_final.pth photo.b64");
-        ExecuteCommand("python3 ../BusinessLogic/ai/main_ocr.py photo.b64 books.json");
+        try{
+            ExecuteCommand("python3 ../BusinessLogic/ai/segmentation.py ../BusinessLogic/ai/model/config.yaml ../BusinessLogic/ai/model/model_final.pth photo.b64");
+            string OcrResultJson = File.ReadAllText("books.json");
+            List<OcrResult> OcrResults = JsonConvert.DeserializeObject<List<OcrResult>>(OcrResultJson);
+            List<OcrRequest> OcrRequests = new List<OcrRequest>();
+            foreach(var Result in OcrResults){
+                var TempOcrRequest = new OcrRequest();
+                TempOcrRequest.x1 = Result.x1;
+                TempOcrRequest.x2 = Result.x2;
+                TempOcrRequest.x3 = Result.x3;
+                TempOcrRequest.x4 = Result.x4;
+                TempOcrRequest.y1 = Result.y1;
+                TempOcrRequest.y2 = Result.y2;
+                TempOcrRequest.y3 = Result.y3;
+                TempOcrRequest.y4 = Result.y4;
+                var PossibleBooks = new List<string>();
+                var Books = await _reposiotry.GetPossibleBooksAsync(Result.RecognizedText);
+                foreach(var Book in Books){
+                    PossibleBooks.Add(Book);
+                }
+                TempOcrRequest.PossibleBooks = PossibleBooks;
+                OcrRequests.Add(TempOcrRequest);
+            }
+            foreach(var Result in OcrResults){
+                foreach(var text in Result.RecognizedText){
+                    Console.WriteLine(text);
+                }
+            }
+            return OcrRequests;
+        }catch(Exception ex){
+            Console.WriteLine("Скрипт питона упал");
+        }
 
         _logger.LogInformation("Ending recognition");
-
+        return new List<OcrRequest>();
     }
     private void ExecuteCommand(string command)
     {
@@ -169,4 +198,3 @@ public class LearningManager
     }
 
 }
-
