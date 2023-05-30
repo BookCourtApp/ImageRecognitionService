@@ -29,7 +29,12 @@ public class MarkupController : ControllerBase
     }
     [HttpPost("PhotoMarkup")]
     public async Task<IActionResult> PhotoMarkup([FromBody] MarkupDto Dto){
-        await _repository.TestAddRangeAsync(Dto.Photos);
+        BooksImage Image = new BooksImage
+        {
+            Image   = Dto.Image,
+            Markups = Dto.Markups
+        };
+        await _repository.MarkupAddAsync(Image);
         _logger.LogInformation("Pushed marukps into a database");
         return Ok(new {requestStatus = "Ok"});
     }
