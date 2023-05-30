@@ -1,6 +1,6 @@
 namespace Core.Models;
 
-public class OcrResult
+public class OcrRequest
 {
     public int x1 { get; set; }
     public int x2 { get; set; }
@@ -10,5 +10,5 @@ public class OcrResult
     public int y2 { get; set; }
     public int y3 { get; set; }
     public int y4 { get; set; }
-    public List<string> RecognizedText { get; set; }
+    public List<string> PossibleBooks { get; set; }
 }
