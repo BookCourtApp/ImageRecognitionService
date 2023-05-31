@@ -12,6 +12,8 @@ from detectron2.config import get_cfg
 from detectron2.data.catalog import Metadata
 from detectron2.engine import DefaultPredictor
 
+import pytesseract
+
 # import some common libraries
 import base64
 import ast
@@ -70,7 +72,7 @@ def load_image_base64(image_data):
 
 # image preprocess before ocr
 def preprocess(image):
-    #upscale image
+    # upscale image
     if image.shape[0] < 100 or image.shape[1] < 100:
         scale_percent = 200  # percent of original size
         width = int(image.shape[1] * scale_percent / 100)
@@ -79,10 +81,68 @@ def preprocess(image):
         image = cv2.resize(image, dim, interpolation=cv2.INTER_LINEAR)
     # sharpen image
     sharp = cv2.filter2D(image, -1, kernel=np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]]))
-    #sharp = cv2.medianBlur(sharp, 1)
+    # sharp = cv2.medianBlur(sharp, 1)
     sharp = cv2.bilateralFilter(sharp, 9, 75, 75)
 
     return sharp
+
+
+def ocr(image, ocr_paddle):
+    # config for tesseract
+    cfg = "--psm 10"
+    lng = 'rus'
+
+    # get text boxes from bookspine
+    boxes = ocr_paddle.ocr(image, det=True, rec=False)
+    # store words of while segmented image
+    words = []
+    for bbox in boxes[0]:
+        if len(bbox) == 0:
+            pass
+        # get coordinates
+        x_min, x_max = min([int(x[0]) for x in bbox]), max([int(x[0]) for x in bbox])
+        y_min, y_max = min([int(y[1]) for y in bbox]), max([int(y[1]) for y in bbox])
+        h = y_max - y_min
+        w = x_max - x_min
+        # crop text area
+        cropped_img = image[y_min:y_min + h, x_min:x_min + w]
+        (h, w) = cropped_img.shape[:2]
+        # store found words on text image
+        word_lst = []
+        # in case of vertical spine
+        if h > w:
+            # Rotate the image by 90 image clockwise
+            rotated = cv2.rotate(cropped_img, cv2.ROTATE_90_CLOCKWISE)
+            ocr_clockwise = pytesseract.image_to_data(rotated, lang=lng, config=cfg, output_type='data.frame')
+            ocr_clockwise = ocr_clockwise[(ocr_clockwise.conf != -1)]
+
+            # Rotate the image by 90 degrees clockwise
+            rotated = cv2.rotate(cropped_img, cv2.ROTATE_90_COUNTERCLOCKWISE)
+            ocr_counter = pytesseract.image_to_data(rotated, lang=lng, config=cfg, output_type='data.frame')
+            ocr_counter = ocr_counter[ocr_counter.conf != -1]
+
+            # choose result in both, clockwise and counterclockwise case
+            if (not ocr_counter.empty) and (not ocr_clockwise.empty):
+                max_clockwise = ocr_clockwise['conf'].max()
+                max_counter = ocr_counter['conf'].max()
+                if max_clockwise < max_counter:
+                    word_lst = ocr_counter['text'].tolist()
+                else:
+                    word_lst = ocr_clockwise['text'].tolist()
+            elif not ocr_counter.empty:
+                word_lst = ocr_counter['text'].tolist()
+            elif not ocr_clockwise.empty:
+                word_lst = ocr_clockwise['text'].tolist()
+        # horizontal spine
+        else:
+            ocr_st = pytesseract.image_to_data(cropped_img, lang=lng, config=cfg, output_type='data.frame')
+            ocr_st = ocr_st[(ocr_st.conf != -1)]
+            word_lst = ocr_st['text'].tolist()
+
+        # post process text
+        word_lst = [str(s).lower() for s in word_lst if len(str(s)) > 2]
+        words.extend(word_lst)
+    return words
 
 
 # load files for model
@@ -92,7 +152,7 @@ path_to_model = sys.argv[2]
 predictor = load_model(path_to_config, path_to_model)
 
 # load OCR model for russian language
-ocr = PaddleOCR(use_angle_cls=True, lang="ru")
+ocr_paddle = PaddleOCR(use_angle_cls=True, lang="ru")
 
 # load image by base64 data
 base64_path = sys.argv[3]
@@ -123,18 +183,17 @@ for item_mask in masks:
     cropped = np.array(cropped)
     # preprocess image
     cropped = preprocess(cropped)
-    # get text bag from image
-    res_paddle = ocr.ocr(np.array(cropped))
-    # filter one symbols
-    wordlist = [word[1][0] for word in res_paddle[0] if len(word[1][0]) > 2]
-    print(wordlist)
+
+    # get text
+    text = ocr(cropped, ocr_paddle)
+    print(text)
     # store it in object
-    book = Book(x_min, x_max, x_min, x_min, y_max, y_max, y_min, y_min, wordlist)
+    book = Book(x_min, x_max, x_min, x_min, y_max, y_max, y_min, y_min, text)
 
     books.append(book.__dict__)
 
 # Save the JSON-formatted string to a file
 result = json.dumps(books)
-#print(result)
+# print(result)
 with open('books.json', 'w') as f:
     f.write(result)
