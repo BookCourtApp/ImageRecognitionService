@@ -9,6 +9,10 @@ using BusinessLogic;
 //using Api.Mapping;
 
 namespace Api.Controllers;
+public class Test{
+    public string Name { get; set; }
+    public List<string> Words { get; set; }
+}
 
 [ApiController]
 [Route("/")]
@@ -26,13 +30,30 @@ public class RecognitionController : ControllerBase
         _learningManager = learningManager;
     }
 
+    [HttpGet("TransferData")]
+    public async Task<IActionResult> Transfer(){
+
+        await _repository.TransferData();
+        return Ok(new {status = "Data was transfered"});
+    }
     [HttpGet("RecognizeTest")]
     public IActionResult RecognizeTest(){
-        return Ok(new {requestStatus = "Ok"});
+
+        var test = new Test { Name = "Pedir", Words = new List<string>{"ONe", "two", "three"}};
+        return Ok(test);
+    }
+    [HttpPost("DbTest")]
+    public IActionResult DbTest([FromBody] DbTestDto DbDto){
+        var Books = _repository.GetPossibleBooksAsync(DbDto.Keywords);
+        return Ok(new {PossibleBooks = Books.Result});
     }
     [HttpPost("Recognition")]
     public async Task<IActionResult> Recognition([FromBody] ImageDto Dto){ 
-        await _learningManager.Recognition(Dto.Image); 
-        return Ok(new {requestStatus = "Ok"});
+        var RecognitionResult = await _learningManager.Recognition(Dto.Image); 
+        return Ok(new RecognitionRequestDto{Result = RecognitionResult});
     }
+}
+
+public class DbTestDto{
+    public List<string> Keywords { get; set; }
 }
