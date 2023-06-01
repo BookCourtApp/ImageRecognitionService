@@ -163,6 +163,25 @@ im = load_image_base64(image_data)
 # make prediction on segmentation
 outputs = predictor(im)
 
+"""from detectron2.utils.visualizer import Visualizer
+from detectron2.utils.visualizer import ColorMode
+from detectron2.data.catalog import Metadata
+
+my_metadata = Metadata()
+my_metadata.set(thing_classes = ['books', 'book spine'])
+v = Visualizer(im[:, :, ::-1],
+    metadata=my_metadata,
+    scale=0.5,
+    instance_mode=ColorMode.IMAGE_BW   # remove the colors of unsegmented pixels. This option is only available for segmentation models
+  )
+out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
+cv2.imshow("window_name",out.get_image()[:, :, ::-1])
+cv2.waitKey(0)
+
+# closing all open windows
+cv2.destroyAllWindows()"""
+
+
 # get masks of found objects
 masks = np.asarray(outputs["instances"].pred_masks.to("cpu"))
 
@@ -188,7 +207,7 @@ for item_mask in masks:
     text = ocr(cropped, ocr_paddle)
     print(text)
     # store it in object
-    book = Book(x_min, x_max, x_min, x_min, y_max, y_max, y_min, y_min, text)
+    book = Book(x_min, x_max, x_max, x_min, y_max, y_max, y_min, y_min, text)
 
     books.append(book.__dict__)
 
