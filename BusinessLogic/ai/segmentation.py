@@ -211,6 +211,21 @@ for item_mask in masks:
 
     books.append(book.__dict__)
 
+    """
+    # trace for test
+    img = np.zeros((im.shape[0], im.shape[1], 3), np.uint8)
+    # Define four points of the quadrilateral
+    pts = np.array([[book.x1, book.y1], [book.x2, book.y2], [book.x3, book.y3], [book.x4, book.y4]])
+    # Draw lines between the points
+    cv2.line(img, tuple(pts[0]), tuple(pts[1]), (0, 255, 0), 2)
+    cv2.line(img, tuple(pts[1]), tuple(pts[2]), (0, 255, 0), 2)
+    cv2.line(img, tuple(pts[2]), tuple(pts[3]), (0, 255, 0), 2)
+    cv2.line(img, tuple(pts[3]), tuple(pts[0]), (0, 255, 0), 2)
+    # Display the image
+    cv2.imshow('Quadrilateral', img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()"""
+
 # Save the JSON-formatted string to a file
 result = json.dumps(books)
 # print(result)
