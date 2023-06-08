@@ -6,12 +6,15 @@ import sys
 import numpy as np
 import ast
 import torch
+import matplotlib.pyplot as plt
+from shapely.geometry import Polygon
+
 
 # import some common detectron2 utilities
 from detectron2.config import get_cfg
 from detectron2.data.catalog import Metadata
 from detectron2.engine import DefaultPredictor
-
+from detectron2.structures import BoxMode
 import pytesseract
 
 # import some common libraries
@@ -80,11 +83,31 @@ def preprocess(image):
         dim = (width, height)
         image = cv2.resize(image, dim, interpolation=cv2.INTER_LINEAR)
     # sharpen image
-    sharp = cv2.filter2D(image, -1, kernel=np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]]))
+    sharp = cv2.filter2D(image, -1,
+                         kernel=np.array(
+                             [[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]]
+                         ))
     # sharp = cv2.medianBlur(sharp, 1)
     sharp = cv2.bilateralFilter(sharp, 9, 75, 75)
 
     return sharp
+
+def remake_word(word):
+    if isinstance(word, float):
+        return str(int(word)).lower()
+
+    symbols = ['!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '-', '=', '[', ']', '{', '}', '|', '\\', ';',
+               ':', '\'', '\"', ',', '.', '/', '<', '>', '?', '`', '~']
+    filtered = ''.join(filter(lambda x: x not in symbols, word))
+    return filtered.lower()
+
+
+def filter_words(word):
+    if len(word)<2:
+        return False
+    if word.count(word[0]) == len(word):
+        return False
+    return True
 
 
 def ocr(image, ocr_paddle):
@@ -100,8 +123,10 @@ def ocr(image, ocr_paddle):
         if len(bbox) == 0:
             pass
         # get coordinates
-        x_min, x_max = min([int(x[0]) for x in bbox]), max([int(x[0]) for x in bbox])
-        y_min, y_max = min([int(y[1]) for y in bbox]), max([int(y[1]) for y in bbox])
+        x_min, x_max = min([int(x[0]) for x in bbox]), \
+                       max([int(x[0]) for x in bbox])
+        y_min, y_max = min([int(y[1]) for y in bbox]), \
+                       max([int(y[1]) for y in bbox])
         h = y_max - y_min
         w = x_max - x_min
         # crop text area
@@ -140,10 +165,32 @@ def ocr(image, ocr_paddle):
             word_lst = ocr_st['text'].tolist()
 
         # post process text
-        word_lst = [str(s).lower() for s in word_lst if len(str(s)) > 2]
+        word_lst = [remake_word(s) for s in word_lst]
+        word_lst = [s for s in word_lst if filter_words(s)]
         words.extend(word_lst)
     return words
 
+def plt_images(im, segm_coord):
+    # Plot each image using imshow()
+    num_rows = int(np.ceil(np.sqrt(len(segm_coord))))
+    fig, axs = plt.subplots(int(np.ceil(len(segm_coord)/4))+1, 4)
+    i = 0
+    for item_mask, ax in zip(segm_coord, axs.flat):
+        # Get coordinates of bounding box
+        x_min = item_mask[0]
+        x_max = item_mask[1]
+        y_min = item_mask[2]
+        y_max = item_mask[3]
+
+        # crop book spine from image
+        cropped = Image.fromarray(im[y_min:y_max, x_min:x_max, :], mode='RGB')
+        cropped = np.array(cropped)
+        # preprocess image
+        cropped = preprocess(cropped)
+        ax.imshow(cropped, cmap='gray')
+        ax.axis('off')
+    # Show the plot
+    plt.show()
 
 # load files for model
 path_to_config = sys.argv[1]
@@ -163,6 +210,9 @@ im = load_image_base64(image_data)
 # make prediction on segmentation
 outputs = predictor(im)
 
+# get masks of found objects
+masks = np.asarray(outputs["instances"].pred_masks.to("cpu"))
+
 """from detectron2.utils.visualizer import Visualizer
 from detectron2.utils.visualizer import ColorMode
 from detectron2.data.catalog import Metadata
@@ -177,16 +227,14 @@ v = Visualizer(im[:, :, ::-1],
 out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
 cv2.imshow("window_name",out.get_image()[:, :, ::-1])
 cv2.waitKey(0)
-
-# closing all open windows
 cv2.destroyAllWindows()"""
 
 
-# get masks of found objects
-masks = np.asarray(outputs["instances"].pred_masks.to("cpu"))
-
+last_box_coord = []
 # iterate every found obj(book)
 books = []
+first = True
+segm_coord = []
 for item_mask in masks:
     # Get the true bounding box of the mask
     segmentation = np.where(item_mask == True)
@@ -197,6 +245,51 @@ for item_mask in masks:
     y_min = int(np.min(segmentation[0]))
     y_max = int(np.max(segmentation[0]))
 
+    segm_coord.append([x_min,x_max,y_min,y_max])
+
+idx_to_del = []
+for i in range(len(segm_coord)):
+    for j in range(i+1, len(segm_coord)):
+        poly1 = Polygon([(segm_coord[i][0], segm_coord[i][2]),
+                         (segm_coord[i][0], segm_coord[i][3]),
+                         (segm_coord[i][1], segm_coord[i][3]),
+                         (segm_coord[i][1], segm_coord[i][2])])
+        poly2 = Polygon([(segm_coord[j][0], segm_coord[j][2]),
+                         (segm_coord[j][0], segm_coord[j][3]),
+                         (segm_coord[j][1], segm_coord[j][3]),
+                         (segm_coord[j][1], segm_coord[j][2])])
+
+        # Calculate the intersection area between poly1 and poly2
+        intersection = poly1.intersection(poly2)
+        intersection_area = intersection.area
+
+        # Calculate the area of the smaller polygon
+        poly1_area = poly1.area
+        poly2_area = poly2.area
+        smaller_area = min(poly1_area, poly2_area)
+
+        # Calculate the percentage of the smaller polygon that is inside the larger polygon
+        percentage_inside = intersection_area / smaller_area * 100
+        #print(f"{percentage_inside} of poly1 is inside poly2 ", i, j)
+        if percentage_inside>80:
+            idx_to_del.append(j)
+            segm_coord[i] = [
+                min(segm_coord[i][0], segm_coord[j][0]),
+                max(segm_coord[i][1], segm_coord[j][1]),
+                min(segm_coord[i][2], segm_coord[j][2]),
+                max(segm_coord[i][3], segm_coord[j][3]),
+            ]
+
+segm_coord = [x for i, x in enumerate(segm_coord) if i not in idx_to_del]
+
+
+for item_mask in segm_coord:
+    # Get coordinates of bounding box
+    x_min = item_mask[0]
+    x_max = item_mask[1]
+    y_min = item_mask[2]
+    y_max = item_mask[3]
+
     # crop book spine from image
     cropped = Image.fromarray(im[y_min:y_max, x_min:x_max, :], mode='RGB')
     cropped = np.array(cropped)
@@ -205,26 +298,11 @@ for item_mask in masks:
 
     # get text
     text = ocr(cropped, ocr_paddle)
-    print(text)
+    #print(text)
     # store it in object
     book = Book(x_min, x_max, x_max, x_min, y_max, y_max, y_min, y_min, text)
 
     books.append(book.__dict__)
-
-    """
-    # trace for test
-    img = np.zeros((im.shape[0], im.shape[1], 3), np.uint8)
-    # Define four points of the quadrilateral
-    pts = np.array([[book.x1, book.y1], [book.x2, book.y2], [book.x3, book.y3], [book.x4, book.y4]])
-    # Draw lines between the points
-    cv2.line(img, tuple(pts[0]), tuple(pts[1]), (0, 255, 0), 2)
-    cv2.line(img, tuple(pts[1]), tuple(pts[2]), (0, 255, 0), 2)
-    cv2.line(img, tuple(pts[2]), tuple(pts[3]), (0, 255, 0), 2)
-    cv2.line(img, tuple(pts[3]), tuple(pts[0]), (0, 255, 0), 2)
-    # Display the image
-    cv2.imshow('Quadrilateral', img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()"""
 
 # Save the JSON-formatted string to a file
 result = json.dumps(books)
