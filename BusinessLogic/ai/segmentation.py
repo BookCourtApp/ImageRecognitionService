@@ -325,7 +325,7 @@ for i, book in enumerate(books):
 
 
 # Save the JSON-formatted string to a file
-result = json.dumps(books)
+result = json.dumps(books_new)
 # print(result)
 with open('books.json', 'w') as f:
     f.write(result)
