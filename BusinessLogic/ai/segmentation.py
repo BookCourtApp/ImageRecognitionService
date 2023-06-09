@@ -103,7 +103,7 @@ def remake_word(word):
 
 
 def filter_words(word):
-    if len(word)<2:
+    if len(word)<3:
         return False
     if word.count(word[0]) == len(word):
         return False
@@ -132,6 +132,11 @@ def ocr(image, ocr_paddle):
         # crop text area
         cropped_img = image[y_min:y_min + h, x_min:x_min + w]
         (h, w) = cropped_img.shape[:2]
+        """"
+        cv2.imshow("window_name", cropped_img)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+        """
         # store found words on text image
         word_lst = []
         # in case of vertical spine
@@ -247,6 +252,28 @@ for item_mask in masks:
 
     segm_coord.append([x_min,x_max,y_min,y_max])
 
+
+for item_mask in segm_coord:
+    # Get coordinates of bounding box
+    x_min = item_mask[0]
+    x_max = item_mask[1]
+    y_min = item_mask[2]
+    y_max = item_mask[3]
+
+    # crop book spine from image
+    cropped = Image.fromarray(im[y_min:y_max, x_min:x_max, :], mode='RGB')
+    cropped = np.array(cropped)
+    # preprocess image
+    cropped = preprocess(cropped)
+
+    # get text
+    text = ocr(cropped, ocr_paddle)
+    #print(text)
+    # store it in object
+    book = Book(x_min, x_max, x_max, x_min, y_max, y_max, y_min, y_min, text)
+    books.append(book.__dict__)
+
+
 idx_to_del = []
 for i in range(len(segm_coord)):
     for j in range(i+1, len(segm_coord)):
@@ -270,39 +297,32 @@ for i in range(len(segm_coord)):
 
         # Calculate the percentage of the smaller polygon that is inside the larger polygon
         percentage_inside = intersection_area / smaller_area * 100
-        #print(f"{percentage_inside} of poly1 is inside poly2 ", i, j)
         if percentage_inside>80:
-            idx_to_del.append(j)
+            m = [i,j]
+            idx_to_del.append(m)
+
             segm_coord[i] = [
                 min(segm_coord[i][0], segm_coord[j][0]),
                 max(segm_coord[i][1], segm_coord[j][1]),
                 min(segm_coord[i][2], segm_coord[j][2]),
                 max(segm_coord[i][3], segm_coord[j][3]),
             ]
+#segm_coord = [x for i, x in enumerate(segm_coord) if i not in idx_to_del]
+books_new = []
+first_column = [t[0] for t in idx_to_del]
+second_column = [t[1] for t in idx_to_del]
+for i, book in enumerate(books):
+    indices = [n for n, j in enumerate(first_column) if j == i]
+    if len(indices)>0:
+        for inx in indices:
+            second_book = idx_to_del[inx][1]
+            books[i]['RecognizedText'].extend(books[second_book]['RecognizedText'])
+for i, book in enumerate(books):
+    indices = [n for n, j in enumerate(second_column) if j == i]
+    if len(indices) == 0:
+        books_new.append(book)
 
-segm_coord = [x for i, x in enumerate(segm_coord) if i not in idx_to_del]
 
-
-for item_mask in segm_coord:
-    # Get coordinates of bounding box
-    x_min = item_mask[0]
-    x_max = item_mask[1]
-    y_min = item_mask[2]
-    y_max = item_mask[3]
-
-    # crop book spine from image
-    cropped = Image.fromarray(im[y_min:y_max, x_min:x_max, :], mode='RGB')
-    cropped = np.array(cropped)
-    # preprocess image
-    cropped = preprocess(cropped)
-
-    # get text
-    text = ocr(cropped, ocr_paddle)
-    #print(text)
-    # store it in object
-    book = Book(x_min, x_max, x_max, x_min, y_max, y_max, y_min, y_min, text)
-
-    books.append(book.__dict__)
 
 # Save the JSON-formatted string to a file
 result = json.dumps(books)
