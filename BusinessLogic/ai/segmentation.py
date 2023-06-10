@@ -118,13 +118,13 @@ def ocr(image, ocr_paddle):
     cfg = "--psm 10"
     lng = 'rus'
 
-    """if image.shape[0] < 100 or image.shape[1] < 100:
+    if image.shape[0] < 100 or image.shape[1] < 100:
         scale_percent = 200  # percent of original size
         width = int(image.shape[1] * scale_percent / 100)
         height = int(image.shape[0] * scale_percent / 100)
         dim = (width, height)
         image = cv2.resize(image.copy(), dim, interpolation=cv2.INTER_LINEAR)
-"""
+
     # get text boxes from bookspine
     boxes = ocr_paddle.ocr(image, det=True, rec=False)
     # store words of while segmented image
@@ -331,11 +331,10 @@ for i in range(len(books)):
 
 
 books = [x for i, x in enumerate(books) if i not in idx_to_del]
-
-
+"""
 for i, book in enumerate(books):
         print(book['RecognizedText'])
-        """x_min = book['x1']
+        x_min = book['x1']
         x_max = book['x3']
         y_min = book['y4']
         y_max = book['y1']
@@ -345,8 +344,8 @@ for i, book in enumerate(books):
         cropped = np.array(cropped)
         cv2.imshow("window_name", cropped)
         cv2.waitKey(0)
-        cv2.destroyAllWindows()"""
-
+        cv2.destroyAllWindows()
+"""
 # Save the JSON-formatted string to a file
 result = json.dumps(books)
 # print(result)
