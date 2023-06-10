@@ -96,9 +96,7 @@ def remake_word(word):
     if isinstance(word, float):
         return str(int(word)).lower()
 
-    symbols = ['!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '-', '=', '[', ']', '{', '}', '|', '\\', ';',
-               ':', '\'', '\"', ',', '.', '/', '<', '>', '?', '`', '~']
-    filtered = ''.join(filter(lambda x: x not in symbols, word))
+    filtered = remove_non_alphanumeric(word)
     return filtered.lower()
 
 
@@ -109,12 +107,24 @@ def filter_words(word):
         return False
     return True
 
+import re
+
+def remove_non_alphanumeric(input_string):
+    pattern = re.compile('[\W_]+')
+    return pattern.sub('', input_string)
 
 def ocr(image, ocr_paddle):
     # config for tesseract
     cfg = "--psm 10"
     lng = 'rus'
 
+    """if image.shape[0] < 100 or image.shape[1] < 100:
+        scale_percent = 200  # percent of original size
+        width = int(image.shape[1] * scale_percent / 100)
+        height = int(image.shape[0] * scale_percent / 100)
+        dim = (width, height)
+        image = cv2.resize(image.copy(), dim, interpolation=cv2.INTER_LINEAR)
+"""
     # get text boxes from bookspine
     boxes = ocr_paddle.ocr(image, det=True, rec=False)
     # store words of while segmented image
@@ -214,28 +224,9 @@ im = load_image_base64(image_data)
 
 # make prediction on segmentation
 outputs = predictor(im)
-
 # get masks of found objects
 masks = np.asarray(outputs["instances"].pred_masks.to("cpu"))
 
-"""from detectron2.utils.visualizer import Visualizer
-from detectron2.utils.visualizer import ColorMode
-from detectron2.data.catalog import Metadata
-
-my_metadata = Metadata()
-my_metadata.set(thing_classes = ['books', 'book spine'])
-v = Visualizer(im[:, :, ::-1],
-    metadata=my_metadata,
-    scale=0.5,
-    instance_mode=ColorMode.IMAGE_BW   # remove the colors of unsegmented pixels. This option is only available for segmentation models
-  )
-out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
-cv2.imshow("window_name",out.get_image()[:, :, ::-1])
-cv2.waitKey(0)
-cv2.destroyAllWindows()"""
-
-
-last_box_coord = []
 # iterate every found obj(book)
 books = []
 first = True
@@ -252,7 +243,6 @@ for item_mask in masks:
 
     segm_coord.append([x_min,x_max,y_min,y_max])
 
-
 for item_mask in segm_coord:
     # Get coordinates of bounding box
     x_min = item_mask[0]
@@ -265,7 +255,6 @@ for item_mask in segm_coord:
     cropped = np.array(cropped)
     # preprocess image
     cropped = preprocess(cropped)
-
     # get text
     text = ocr(cropped, ocr_paddle)
     #print(text)
@@ -274,17 +263,22 @@ for item_mask in segm_coord:
     books.append(book.__dict__)
 
 
+
 idx_to_del = []
-for i in range(len(segm_coord)):
-    for j in range(i+1, len(segm_coord)):
-        poly1 = Polygon([(segm_coord[i][0], segm_coord[i][2]),
-                         (segm_coord[i][0], segm_coord[i][3]),
-                         (segm_coord[i][1], segm_coord[i][3]),
-                         (segm_coord[i][1], segm_coord[i][2])])
-        poly2 = Polygon([(segm_coord[j][0], segm_coord[j][2]),
-                         (segm_coord[j][0], segm_coord[j][3]),
-                         (segm_coord[j][1], segm_coord[j][3]),
-                         (segm_coord[j][1], segm_coord[j][2])])
+for i in range(len(books)):
+    for j in range(len(books)):
+        if j==i:
+            continue
+        book1 = books[i]
+        book2 = books[j]
+        poly1 = Polygon([(book1['x1'], book1['y1']),
+                         (book1['x2'], book1['x2']),
+                         (book1['x3'], book1['x3']),
+                         (book1['x4'], book1['x4'])])
+        poly2 = Polygon([(book2['x1'], book2['y1']),
+                         (book2['x2'], book2['y2']),
+                         (book2['x3'], book2['y3']),
+                         (book2['x4'], book2['y4'])])
 
         # Calculate the intersection area between poly1 and poly2
         intersection = poly1.intersection(poly2)
@@ -295,37 +289,66 @@ for i in range(len(segm_coord)):
         poly2_area = poly2.area
         smaller_area = min(poly1_area, poly2_area)
 
+        smaller2 = True
+        if poly2_area > poly1_area:
+            smaller2 = False
+
         # Calculate the percentage of the smaller polygon that is inside the larger polygon
         percentage_inside = intersection_area / smaller_area * 100
-        if percentage_inside>80:
-            m = [i,j]
-            idx_to_del.append(m)
+        #print(percentage_inside)
+        if percentage_inside > 90:
+            #idx_to_del.append(m)
+            if smaller2:
+                idx_to_del.append(j)
+                books[i]['RecognizedText'].extend(books[j]['RecognizedText'])
 
-            segm_coord[i] = [
-                min(segm_coord[i][0], segm_coord[j][0]),
-                max(segm_coord[i][1], segm_coord[j][1]),
-                min(segm_coord[i][2], segm_coord[j][2]),
-                max(segm_coord[i][3], segm_coord[j][3]),
-            ]
-#segm_coord = [x for i, x in enumerate(segm_coord) if i not in idx_to_del]
-books_new = []
-first_column = [t[0] for t in idx_to_del]
-second_column = [t[1] for t in idx_to_del]
+                books[i]['x1'] = min(book1['x1'], book2['x1'])
+                books[i]['y1'] = max(book1['y1'], book2['y1'])
+
+                books[i]['x2'] = max(book1['x2'], book2['x2'])
+                books[i]['y2'] = max(book1['y2'], book2['y2'])
+
+                books[i]['x3'] = max(book1['x3'], book2['x3'])
+                books[i]['y3'] = min(book1['y3'], book2['y3'])
+
+                books[i]['x4'] = min(book1['x4'], book2['x4'])
+                books[i]['y4'] = min(book1['y4'], book2['y4'])
+            else:
+                idx_to_del.append(i)
+                books[j]['RecognizedText'].extend(books[j]['RecognizedText'])
+
+                books[j]['x1'] = min(book1['x1'], book2['x1'])
+                books[j]['y1'] = max(book1['y1'], book2['y1'])
+
+                books[j]['x2'] = max(book1['x2'], book2['x2'])
+                books[j]['y2'] = max(book1['y2'], book2['y2'])
+
+                books[j]['x3'] = max(book1['x3'], book2['x3'])
+                books[j]['y3'] = min(book1['y3'], book2['y3'])
+
+                books[j]['x4'] = min(book1['x4'], book2['x4'])
+                books[j]['y4'] = min(book1['y4'], book2['y4'])
+
+
+books = [x for i, x in enumerate(books) if i not in idx_to_del]
+
+
 for i, book in enumerate(books):
-    indices = [n for n, j in enumerate(first_column) if j == i]
-    if len(indices)>0:
-        for inx in indices:
-            second_book = idx_to_del[inx][1]
-            books[i]['RecognizedText'].extend(books[second_book]['RecognizedText'])
-for i, book in enumerate(books):
-    indices = [n for n, j in enumerate(second_column) if j == i]
-    if len(indices) == 0:
-        books_new.append(book)
+        print(book['RecognizedText'])
+        """x_min = book['x1']
+        x_max = book['x3']
+        y_min = book['y4']
+        y_max = book['y1']
 
-
+        # crop book spine from image
+        cropped = Image.fromarray(im[y_min:y_max, x_min:x_max, :], mode='RGB')
+        cropped = np.array(cropped)
+        cv2.imshow("window_name", cropped)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()"""
 
 # Save the JSON-formatted string to a file
-result = json.dumps(books_new)
+result = json.dumps(books)
 # print(result)
 with open('books.json', 'w') as f:
     f.write(result)
