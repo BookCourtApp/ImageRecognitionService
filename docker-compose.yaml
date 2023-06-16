@@ -9,5 +9,7 @@ services:
       - node.name=elasticsearch
       - discovery.type=single-node
       - ES_JAVA_OPTS=-Xms1g -Xmx2g
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
     volumes:
       - ./Infrastructure/esdata:/usr/share/elasticsearch/data

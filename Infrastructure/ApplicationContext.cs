@@ -13,7 +13,6 @@ public class ApplicationContext : DbContext
         Database.EnsureCreated();
     }
 }
-
 public class BooksContext : DbContext
 {
     public DbSet<Book> DB { get; set; }
