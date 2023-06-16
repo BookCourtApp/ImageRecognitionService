@@ -4,7 +4,6 @@ namespace Core.Models;
 public class Markup
 {
     public Guid Id { get; set; }
-    //public string Image { get; set; }
     public int x1 { get; set; }
     public int x2 { get; set; }
     public int x3 { get; set; }
