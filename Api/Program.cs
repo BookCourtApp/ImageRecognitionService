@@ -1,11 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Sqlite;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Serilog;
 using Nest;
-using Elasticsearch.Net;
 
 using Infrastructure;
 using Infrastructure.DataAccessLayer;
@@ -17,7 +12,6 @@ Log.Logger = new LoggerConfiguration()
 
 try
 {
-
     var builder = WebApplication.CreateBuilder(args);
 
     builder.Host.UseSerilog(
@@ -49,6 +43,22 @@ try
         }
     );
 
+    builder.Services.AddCors(options =>
+        {
+            options.AddPolicy("AllowAllOrigins",
+                builder =>
+                {
+                    builder.WithOrigins("http://localhost:3000",
+                    "https://cea5-176-59-134-95.ngrok-free.app")
+                        .AllowCredentials()
+                        .AllowAnyHeader()
+                        .AllowAnyMethod();
+
+                }
+            );
+        }
+    );
+
     var app = builder.Build();
 
     // Configure the HTTP request pipeline.
@@ -59,6 +69,11 @@ try
     }
 
     app.UseHttpsRedirection();
+
+    app.UseCors(policy => policy.AllowAnyHeader()
+        .AllowAnyMethod()
+        .WithOrigins("http://localhost:3000", "https://cea5-176-59-134-95.ngrok-free.app")
+        .AllowCredentials());
 
     app.UseAuthorization();
 

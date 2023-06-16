@@ -1,59 +1,83 @@
 using Microsoft.AspNetCore.Mvc;
-using Newtonsoft.Json;
-using System.Text.Json;
-
 using Core.Repository;
 using Core.Models;
 using BusinessLogic;
-//using Core.ModelsDto;
-//using Api.Mapping;
+using Nest;
 
 namespace Api.Controllers;
-public class Test{
-    public string Name { get; set; }
-    public List<string> Words { get; set; }
-}
 
 [ApiController]
 [Route("/")]
 public class RecognitionController : ControllerBase
 {
-
     private readonly ILogger<RecognitionController> _logger;
     private readonly IRepository _repository;
     private readonly LearningManager _learningManager;
-
-    public RecognitionController(ILogger<RecognitionController> logger, IRepository repository, LearningManager learningManager)
+    public RecognitionController(
+        ILogger<RecognitionController> logger, 
+        IRepository repository, 
+        LearningManager learningManager)
     {
         _logger = logger;
         _repository = repository;
         _learningManager = learningManager;
     }
-
-    [HttpGet("TransferData")]
-    public async Task<IActionResult> Transfer(){
-
-        await _repository.TransferData();
-        return Ok(new {status = "Data was transfered"});
-    }
-    [HttpGet("RecognizeTest")]
-    public IActionResult RecognizeTest(){
-
-        var test = new Test { Name = "Pedir", Words = new List<string>{"ONe", "two", "three"}};
-        return Ok(test);
+    [HttpPost("Recognition")]
+    public async Task<IActionResult> Recognition([FromBody] ImageDto Dto){
+        string ToDelete = "data:image/jpeg;base64,";
+        if(Dto.Image.StartsWith(ToDelete)){
+            Dto.Image = Dto.Image.Remove(0, ToDelete.Length);
+        }
+        var RecognitionResult = await _learningManager.Recognition(Dto.Image); 
+        foreach(var result in RecognitionResult){
+            //result.PossibleBooks = result.PossibleBooks.Select(b => b.ToLower()).Distinct().ToList();
+            Console.WriteLine($"amount:{result.PossibleBooks.Count} ");
+        }
+        return Ok(new RecognitionRequestDto{Result = RecognitionResult});
     }
     [HttpPost("DbTest")]
-    public IActionResult DbTest([FromBody] DbTestDto DbDto){
-        var Books = _repository.GetPossibleBooksAsync(DbDto.Keywords);
-        return Ok(new {PossibleBooks = Books.Result});
+    public async Task<IActionResult> DbTest([FromBody] DbTestDto DbDto){
+        var Books = await _repository.GetBooksByKeywordAsync(DbDto.Keyword);
+        var ConvertMe = new List<string>();
+        foreach(var hit in Books.Hits){
+            ConvertMe.Add(hit.Source.Info);
+        }
+        var Response = new DbTestRequest
+        {
+            Books = ConvertMe
+        };
+        return Ok(Response);
     }
-    [HttpPost("Recognition")]
-    public async Task<IActionResult> Recognition([FromBody] ImageDto Dto){ 
-        var RecognitionResult = await _learningManager.Recognition(Dto.Image); 
-        return Ok(new RecognitionRequestDto{Result = RecognitionResult});
+    [HttpPost("DbTest2")]
+    public async Task<IActionResult> DbTest([FromBody] DbTestDto2 DbDto){
+        
+        var Response = new DbTestRequest
+        {
+            Books = await _learningManager.GetPossibleBooksAsync(DbDto.Keywords)
+        };
+        return Ok(Response);
+    }
+    [HttpGet("test")]
+    public async Task<IActionResult> Test(){
+        
+        return Ok("Hello");
     }
 }
 
 public class DbTestDto{
+    public string Keyword { get; set; }
+}
+public class DbTestDto2{
     public List<string> Keywords { get; set; }
 }
+public class DbTestRequest
+{
+    public List<string> Books{ get;set;}
+}
+
+//[HttpGet("TransferData")]
+//public async Task<IActionResult> Transfer(){
+
+//    await _repository.TransferData();
+//    return Ok(new {status = "Data was transfered"});
+//}
