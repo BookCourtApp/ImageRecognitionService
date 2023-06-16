@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 from shapely.geometry import Polygon
 import re
 
-
 # import some common detectron2 utilities
 from detectron2.config import get_cfg
 from detectron2.data.catalog import Metadata
@@ -93,6 +92,7 @@ def preprocess(image):
 
     return sharp
 
+
 def remake_word(word):
     if isinstance(word, float):
         return str(int(word)).lower()
@@ -101,16 +101,50 @@ def remake_word(word):
     return filtered.lower()
 
 
+green_words = ['ар', 'ан', 'аз', 'ах', 'аж', 'ау', 'ад', 'ас', 'аи', 'ао',
+               'бы', '', '',
+               'во',
+               'го',
+               'до', 'де',  'да',
+               'ее', 'её', 'еж', 'ёж', 'ея',
+               'же',
+               'оз', 'об', 'ош', 'от',
+               'за',
+               'ил',  'из', 'ия', 'иа',
+               'ко',
+               'ль',
+               'мы', 'ми',
+               'по',
+               'ни', 'на', 'ну', 'но',
+               'он', 'ом', 'об', 'ох', 'ор',
+               'ре',
+               'ля',
+               'по', 'па',
+               'со', 'се', 'си',
+               'ум', 'уж', 'ус',
+               'ша',
+               'фа',
+               'щи',
+               'эй',
+               'юс', 'юг', 'юз', 'юк',
+               'яд', 'яр', 'ям', 'ял', 'яо', 'ян', 'як', 'яр'
+               ]
+
+
 def filter_words(word):
-    if len(word)<3:
+    if len(word) < 3:
+        if word in green_words:
+            return True
         return False
     if word.count(word[0]) == len(word):
         return False
     return True
 
+
 def remove_non_alphanumeric(input_string):
     pattern = re.compile('[\W_]+')
     return pattern.sub('', input_string)
+
 
 def ocr(image, ocr_paddle):
     # config for tesseract
@@ -150,12 +184,12 @@ def ocr(image, ocr_paddle):
             # Rotate the image by 90 image clockwise
             rotated = cv2.rotate(cropped_img, cv2.ROTATE_90_CLOCKWISE)
             ocr_clockwise = pytesseract.image_to_data(rotated, lang=lng, config=cfg, output_type='data.frame')
-            ocr_clockwise = ocr_clockwise[(ocr_clockwise.conf != -1)]
+            ocr_clockwise = ocr_clockwise[(ocr_clockwise.conf > 0)]
 
             # Rotate the image by 90 degrees clockwise
             rotated = cv2.rotate(cropped_img, cv2.ROTATE_90_COUNTERCLOCKWISE)
             ocr_counter = pytesseract.image_to_data(rotated, lang=lng, config=cfg, output_type='data.frame')
-            ocr_counter = ocr_counter[ocr_counter.conf != -1]
+            ocr_counter = ocr_counter[ocr_counter.conf > 0]
 
             # choose result in both, clockwise and counterclockwise case
             if (not ocr_counter.empty) and (not ocr_clockwise.empty):
@@ -180,9 +214,9 @@ def ocr(image, ocr_paddle):
         # horizontal spine
         else:
             ocr_st = pytesseract.image_to_data(cropped_img, lang=lng, config=cfg, output_type='data.frame')
-            ocr_st = ocr_st[(ocr_st.conf != -1)]
+            ocr_st = ocr_st[(ocr_st.conf > 0)]
 
-            tmp_word_cond.append(ocr_st[['text','conf']].values.tolist())
+            tmp_word_cond.append(ocr_st[['text', 'conf']].values.tolist())
             word_lst = ocr_st['text'].tolist()
 
         # post process text
@@ -192,18 +226,18 @@ def ocr(image, ocr_paddle):
     for cell in tmp_word_cond:
         for text in cell:
             t = remake_word(text[0])
-            if not filter_words(t) or text[1]<1:
+            if not filter_words(t) or text[1] < 1:
                 print(f"dropped {text[0]}, conf {text[1]}")
             else:
                 print(f"pass    {text[0]}, conf {text[1]}")
 
-
     return words
+
 
 def plt_images(im, segm_coord):
     # Plot each image using imshow()
     num_rows = int(np.ceil(np.sqrt(len(segm_coord))))
-    fig, axs = plt.subplots(int(np.ceil(len(segm_coord)/4))+1, 4)
+    fig, axs = plt.subplots(int(np.ceil(len(segm_coord) / 4)) + 1, 4)
     i = 0
     for item_mask, ax in zip(segm_coord, axs.flat):
         # Get coordinates of bounding box
@@ -221,6 +255,7 @@ def plt_images(im, segm_coord):
         ax.axis('off')
     # Show the plot
     plt.show()
+
 
 # load files for model
 path_to_config = sys.argv[1]
@@ -256,7 +291,7 @@ for item_mask in masks:
     y_min = int(np.min(segmentation[0]))
     y_max = int(np.max(segmentation[0]))
 
-    segm_coord.append([x_min,x_max,y_min,y_max])
+    segm_coord.append([x_min, x_max, y_min, y_max])
 
 for item_mask in segm_coord:
     # Get coordinates of bounding box
@@ -272,17 +307,15 @@ for item_mask in segm_coord:
     cropped = preprocess(cropped)
     # get text
     text = ocr(cropped, ocr_paddle)
-    #print(text)
+    # print(text)
     # store it in object
     book = Book(x_min, x_max, x_max, x_min, y_max, y_max, y_min, y_min, text)
     books.append(book.__dict__)
 
-
-
 idx_to_del = []
 for i in range(len(books)):
     for j in range(len(books)):
-        if j==i:
+        if j == i:
             continue
         book1 = books[i]
         book2 = books[j]
@@ -310,9 +343,9 @@ for i in range(len(books)):
 
         # Calculate the percentage of the smaller polygon that is inside the larger polygon
         percentage_inside = intersection_area / smaller_area * 100
-        #print(percentage_inside)
+        # print(percentage_inside)
         if percentage_inside > 90:
-            #idx_to_del.append(m)
+            # idx_to_del.append(m)
             if smaller2:
                 idx_to_del.append(j)
                 books[i]['RecognizedText'].extend(books[j]['RecognizedText'])
@@ -330,7 +363,7 @@ for i in range(len(books)):
                 books[i]['y4'] = min(book1['y4'], book2['y4'])
             else:
                 idx_to_del.append(i)
-                books[j]['RecognizedText'].extend(books[j]['RecognizedText'])
+                books[j]['RecognizedText'].extend(books[i]['RecognizedText'])
 
                 books[j]['x1'] = min(book1['x1'], book2['x1'])
                 books[j]['y1'] = max(book1['y1'], book2['y1'])
@@ -343,7 +376,6 @@ for i in range(len(books)):
 
                 books[j]['x4'] = min(book1['x4'], book2['x4'])
                 books[j]['y4'] = min(book1['y4'], book2['y4'])
-
 
 books = [x for i, x in enumerate(books) if i not in idx_to_del]
 """
@@ -361,6 +393,8 @@ for i, book in enumerate(books):
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 """
+for book in books:
+    print(book)
 # Save the JSON-formatted string to a file
 result = json.dumps(books)
 # print(result)
