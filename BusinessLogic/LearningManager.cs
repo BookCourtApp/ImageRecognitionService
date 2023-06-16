@@ -1,15 +1,10 @@
-using IronPython.Hosting;
-using IronPython;
 using Newtonsoft.Json;
-using System.Text.Json;
-using Microsoft.Scripting.Hosting;
-using System.Collections;
 using System.Timers;
 using System.Diagnostics;
+using F23.StringSimilarity;
 
 using Core.Repository;
 using Core.Models;
-using Infrastructure.DataAccessLayer;
 using Microsoft.Extensions.Logging;
 
 namespace BusinessLogic;
@@ -25,7 +20,7 @@ public class LearningManager
         {"Week", 604800000},
         {"Month", 2592000000},
     };
-    private readonly IRepository _reposiotry;
+    private readonly IRepository _repository;
     private System.Timers.Timer LearnTimer;
     private string _weights;
     private LearnSession _currentLearnVersion;
@@ -33,7 +28,7 @@ public class LearningManager
     private readonly ILogger<LearningManager> _logger;
     public LearningManager(IRepository repository, ILogger<LearningManager> Logger)
     {
-        _reposiotry = repository;
+        _repository = repository;
         _logger = Logger;
     }
 
@@ -48,14 +43,14 @@ public class LearningManager
         switch (Request)
         {
             case "Latest":
-                _currentLearnVersion = await _reposiotry.GetLatestLearnSession();
+                _currentLearnVersion = await _repository.GetLatestLearnSession();
                 break;
             case "Best":
-                _currentLearnVersion = await _reposiotry.GetBestLearnSession();
+                _currentLearnVersion = await _repository.GetBestLearnSession();
                 break;
             default:
                 Guid Id = new Guid(Request);
-                _currentLearnVersion = await _reposiotry.GetLearnSessionById(Id);
+                _currentLearnVersion = await _repository.GetLearnSessionById(Id);
                 break;
         }
         _logger.LogInformation($"Learn version picked: {Request}");
@@ -98,7 +93,7 @@ public class LearningManager
     /// <returns>Возвращает список всех версий обучений </returns>
     public async Task<List<LearnSession>> ShowLearnSessions()
     {
-        var result = await _reposiotry.GetAllLearnSessions();
+        var result = await _repository.GetAllLearnSessions();
         _logger.LogInformation("Learn session returned");
         return result;
     }
@@ -143,28 +138,45 @@ public class LearningManager
         _logger.LogInformation("Starting recognition");
 
         try{
-            ExecuteCommand("python3 ../BusinessLogic/ai/segmentation.py ../BusinessLogic/ai/model/config.yaml ../BusinessLogic/ai/model/model_final.pth photo.b64");
+            ExecuteCommand(
+                "python3 "                                   +
+                "../BusinessLogic/ai/segmentation.py "       +
+                "../BusinessLogic/ai/model/config.yaml "     +
+                "../BusinessLogic/ai/model/model_final.pth " +
+                "photo.b64 ");
             string OcrResultJson = File.ReadAllText("books.json");
             List<OcrResult> OcrResults = JsonConvert.DeserializeObject<List<OcrResult>>(OcrResultJson);
             List<OcrRequest> OcrRequests = new List<OcrRequest>();
+            Console.WriteLine("До каких либо фильтраций");
+            foreach(var Result in OcrResults){
+                foreach(var text in Result.RecognizedText){
+                    Console.WriteLine(text);
+                }
+            }
+            var jw = new JaroWinkler();
             foreach(var Result in OcrResults){
                 var TempOcrRequest = new OcrRequest();
-                TempOcrRequest.x1 = Result.x1;
-                TempOcrRequest.x2 = Result.x2;
-                TempOcrRequest.x3 = Result.x3;
-                TempOcrRequest.x4 = Result.x4;
-                TempOcrRequest.y1 = Result.y1;
-                TempOcrRequest.y2 = Result.y2;
-                TempOcrRequest.y3 = Result.y3;
-                TempOcrRequest.y4 = Result.y4;
+                MapFirstToSecond(Result, TempOcrRequest);
                 var PossibleBooks = new List<string>();
-                var Books = await _reposiotry.GetPossibleBooksAsync(Result.RecognizedText);
-                foreach(var Book in Books){
-                    PossibleBooks.Add(Book);
+                var BookNames = await GetPossibleBooksAsync(Result.RecognizedText.Select(b => b.ToLower()).Distinct().ToList());
+                BookNames =  BookNames.Select(b => b.ToLower()).Distinct().ToList();
+                foreach(var Name in BookNames){
+                    if(BookNames.Count > 100){
+                        foreach(var RecognizedText in Result.RecognizedText){
+                            var posib = jw.Similarity(RecognizedText, Name);
+                            if(posib > 0.600){
+                                //Console.WriteLine($"Similarity: {posib}: RT{RecognizedText} - BN{Name}");
+                                PossibleBooks.Add(Name);
+                            }
+                        }
+                        continue;
+                    }
+                    PossibleBooks.Add(Name);
                 }
-                TempOcrRequest.PossibleBooks = PossibleBooks;
+                TempOcrRequest.PossibleBooks = PossibleBooks.Select(b => b.ToLower()).Distinct().ToList();
                 OcrRequests.Add(TempOcrRequest);
             }
+            Console.WriteLine("После фильтраций каких то");
             foreach(var Result in OcrResults){
                 foreach(var text in Result.RecognizedText){
                     Console.WriteLine(text);
@@ -172,7 +184,7 @@ public class LearningManager
             }
             return OcrRequests;
         }catch(Exception ex){
-            Console.WriteLine("Скрипт питона упал");
+            Console.WriteLine($"Error occured while processing recognition: {ex}");
         }
 
         _logger.LogInformation("Ending recognition");
@@ -196,5 +208,68 @@ public class LearningManager
             Console.WriteLine(process.StandardOutput.ReadToEnd());
         }
     }
+    public void MapFirstToSecond(OcrResult First, OcrRequest Second){
+        Second.x1 = First.x1;
+        Second.x2 = First.x2;
+        Second.x3 = First.x3;
+        Second.x4 = First.x4;
+        Second.y1 = First.y1;
+        Second.y2 = First.y2;
+        Second.y3 = First.y3;
+        Second.y4 = First.y4;
+    }
 
+    public async Task<List<string>> GetPossibleBooksAsync(List<string> Keywords){
+        List<List<ElasticResponse>> Responses = new List<List<ElasticResponse>>();
+        foreach(var keyword in Keywords){
+            var searchRequest = await _repository.GetBooksByKeywordAsync(keyword);
+            var Response = new List<ElasticResponse>();
+            foreach (var hit in searchRequest.Hits)
+            {
+                Response.Add(new ElasticResponse{ 
+                    BookInfo = hit.Source.Info,
+                    EntryPoints = 0
+                    }
+                );
+            }
+            Responses.Add(Response);
+        }
+        for (var i = 0; i < Responses.Count; i++){
+            for (var b = i+1; b < Responses.Count; b++){
+                for (var c = 0; c < Responses[i].Count; c++){
+                    foreach (var BookName in Responses[b]){
+                        if (Responses[i][c].BookInfo == BookName.BookInfo){
+                            Responses[i][c].EntryPoints++;
+                        }
+                    }
+                }
+            }
+        }
+        List<string> Result = new List<string>();
+        if(Responses.Count == 1){
+            foreach(var Response in Responses){
+                foreach(var Structure in Response){
+                    Result.Add(Structure.BookInfo);
+                }
+            }
+            return Result;
+        }
+        var IsThereAnyGoodEntries = 0;
+        foreach(var Response in Responses){
+            foreach(var Structure in Response){
+                if(Structure.EntryPoints > 0){
+                    IsThereAnyGoodEntries++;
+                    Result.Add(Structure.BookInfo);
+                }
+            }
+        }
+        if(IsThereAnyGoodEntries == 0){
+            foreach(var Response in Responses){
+                foreach(var Structure in Response){
+                    Result.Add(Structure.BookInfo);
+                }
+            }
+        }
+        return Result;
+    }
 }
