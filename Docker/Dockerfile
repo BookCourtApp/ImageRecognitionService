@@ -4,14 +4,14 @@ FROM hdgigante/python-opencv:4.7.0-ubuntu
 RUN apt update && apt -y upgrade
 RUN apt install -y build-essential
 
-RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb
-RUN dpkg -i cuda-keyring_1.0-1_all.deb
-RUN apt-get update -y
-RUN apt-get -y install cuda
-
-ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
-ENV PATH=/usr/local/cuda/bin:$PATH
-RUN ldconfig
+#RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin
+#RUN  mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600
+#RUN wget https://developer.download.nvidia.com/compute/cuda/11.5.0/local_installers/cuda-repo-ubuntu2004-11-5-local_11.5.0-495.29.05-1_amd64.deb
+#RUN  dpkg -i cuda-repo-ubuntu2004-11-5-local_11.5.0-495.29.05-1_amd64.deb
+#RUN  apt-key add /var/cuda-repo-ubuntu2004-11-5-local/7fa2af80.pub
+#RUN  apt-get update
+#RUN  apt-get -y install cuda
+RUN apt-get install nvidia-cuda-toolkit -y
 
 
 RUN pip3 install torch torchvision torchaudio
@@ -44,4 +44,5 @@ RUN apt-get install tesseract-ocr-rus
 # assign workdir
 WORKDIR .
 COPY . .
+
 RUN python3 padleFIX.py
